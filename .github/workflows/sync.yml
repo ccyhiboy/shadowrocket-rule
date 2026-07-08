@@ -1,0 +1,49 @@
+name: Sync upstream Shadowrocket config
+
+on:
+  schedule:
+    # 每天 UTC 20:00（北京时间次日 04:00）自动同步
+    - cron: '0 20 * * *'
+  workflow_dispatch: {}   # 支持在 Actions 页面手动点击运行
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch upstream and inject custom rules
+        run: |
+          set -e
+          UPSTREAM="https://raw.githubusercontent.com/LOWERTOP/Shadowrocket/refs/heads/main/lazy_group.conf"
+          BROKER_LINE="RULE-SET,https://raw.githubusercontent.com/LingJingMaster/Shadowrocket-Rules/main/HK_Broker.list,香港节点"
+
+          # 下载上游最新配置
+          curl -fsSL "$UPSTREAM" -o upstream.conf
+
+          # 在 [Rule] 段的第一行后面插入券商规则（走香港节点）
+          awk -v line="$BROKER_LINE" '
+            { print }
+            /^\[Rule\]/ && !done {
+              print "# ==== 自定义：香港券商，走香港节点，规避 IP 检测 ===="
+              print line
+              print ""
+              done=1
+            }
+          ' upstream.conf > my_shadowrocket.conf
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- my_shadowrocket.conf; then
+            echo "No changes."
+          else
+            git add my_shadowrocket.conf
+            git commit -m "chore: sync upstream config $(date -u +%Y-%m-%d)"
+            git push
+          fi
