@@ -21,18 +21,37 @@ jobs:
           set -e
           UPSTREAM="https://raw.githubusercontent.com/LOWERTOP/Shadowrocket/refs/heads/main/lazy_group.conf"
           BROKER_LINE="RULE-SET,https://raw.githubusercontent.com/LingJingMaster/Shadowrocket-Rules/main/HK_Broker.list,香港节点"
+          PV_LINE="RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AmazonPrimeVideo/AmazonPrimeVideo.list,PrimeVideo"
+          PV_GROUP="PrimeVideo = select,美国节点,PROXY,香港节点,台湾节点,日本节点,新加坡节点,韩国节点,policy-select-name=美国节点"
 
           # 下载上游最新配置
           curl -fsSL "$UPSTREAM" -o upstream.conf
 
-          # 在 [Rule] 段的第一行后面插入券商规则（走香港节点）
-          awk -v line="$BROKER_LINE" '
+          # 1) 修改已有策略组的默认线路：
+          #    AI、谷歌服务 -> 美国节点；Netflix -> 香港节点
+          sed -i \
+            -e '/^AI = /s/policy-select-name=PROXY/policy-select-name=美国节点/' \
+            -e '/^谷歌服务 = /s/policy-select-name=PROXY/policy-select-name=美国节点/' \
+            -e '/^Amazon = /s/policy-select-name=PROXY/policy-select-name=美国节点/' \
+            -e '/^Netflix = /s/policy-select-name=PROXY/policy-select-name=香港节点/' \
+            upstream.conf
+
+          # 2) 插入自定义规则和 Prime Video 策略组
+          awk -v broker="$BROKER_LINE" -v pv="$PV_LINE" -v pvgroup="$PV_GROUP" '
             { print }
-            /^\[Rule\]/ && !done {
+            # 在 [Proxy Group] 里的 游戏平台 组后面新增 Prime Video 组
+            /^游戏平台 = / && !g {
+              print pvgroup
+              g=1
+            }
+            # 在 [Rule] 段顶部插入券商、Prime Video 规则（优先匹配）
+            /^\[Rule\]/ && !r {
               print "# ==== 自定义：香港券商，走香港节点，规避 IP 检测 ===="
-              print line
+              print broker
+              print "# ==== 自定义：Prime Video，默认走美国 ===="
+              print pv
               print ""
-              done=1
+              r=1
             }
           ' upstream.conf > my_shadowrocket.conf
 
