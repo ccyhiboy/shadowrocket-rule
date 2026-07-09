@@ -28,6 +28,10 @@ jobs:
           BROKER_LINE="RULE-SET,https://raw.githubusercontent.com/LingJingMaster/Shadowrocket-Rules/main/HK_Broker.list,香港节点"
           PV_LINE="RULE-SET,https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Shadowrocket/AmazonPrimeVideo/AmazonPrimeVideo.list,PrimeVideo"
           PV_GROUP="PrimeVideo = select,美国节点,PROXY,香港节点,台湾节点,日本节点,新加坡节点,韩国节点,policy-select-name=美国节点"
+          # 新增国家节点组（与上游同款：url-test + 正则筛选）
+          IN_GROUP="印度节点 = url-test,url=http://www.gstatic.com/generate_204,interval=600,tolerance=0,timeout=5,select=0,policy-regex-filter=🇮🇳|IN|India|india|Mumbai|mumbai|印度|孟买|班加罗尔"
+          UK_GROUP="英国节点 = url-test,url=http://www.gstatic.com/generate_204,interval=600,tolerance=0,timeout=5,select=0,policy-regex-filter=🇬🇧|UK|GB|GBR|United Kingdom|Britain|England|London|london|英国|英國|伦敦"
+          BR_GROUP="巴西节点 = url-test,url=http://www.gstatic.com/generate_204,interval=600,tolerance=0,timeout=5,select=0,policy-regex-filter=🇧🇷|BR|BRA|Brazil|brazil|Brasil|Sao Paulo|巴西|圣保罗|圣保"
 
           # 下载上游最新配置
           curl -fsSL "$UPSTREAM" -o upstream.conf
@@ -42,12 +46,20 @@ jobs:
             upstream.conf
 
           # 2) 插入自定义规则和 Prime Video 策略组
-          awk -v broker="$BROKER_LINE" -v pv="$PV_LINE" -v pvgroup="$PV_GROUP" '
+          awk -v broker="$BROKER_LINE" -v pv="$PV_LINE" -v pvgroup="$PV_GROUP" \
+              -v ingroup="$IN_GROUP" -v ukgroup="$UK_GROUP" -v brgroup="$BR_GROUP" '
             { print }
             # 在 [Proxy Group] 里的 游戏平台 组后面新增 Prime Video 组
             /^游戏平台 = / && !g {
               print pvgroup
               g=1
+            }
+            # 在最后一个国家节点组（美国节点）后面新增 印度/英国/巴西 节点组
+            /^美国节点 = / && !c {
+              print ingroup
+              print ukgroup
+              print brgroup
+              c=1
             }
             # 在 [Rule] 段顶部插入券商、Prime Video 规则（优先匹配）
             /^\[Rule\]/ && !r {
