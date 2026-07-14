@@ -3,7 +3,7 @@ name: Sync upstream Shadowrocket config
 on:
   schedule:
     # 每天 UTC 20:00（北京时间次日 04:00）自动同步
-    - cron: '0 20 * * *'
+    - cron: '0 20 */3 * *'
   workflow_dispatch: {}   # 支持在 Actions 页面手动点击运行
 
 permissions:
